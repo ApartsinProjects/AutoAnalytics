@@ -6,6 +6,7 @@ postgres_cfg={
 import psycopg2,logging, uuid
 from psycopg2.extras import RealDictCursor
 
+
 class SQLStore:
     
     def __init__(self,cfg=postgres_cfg):
@@ -37,7 +38,7 @@ class SQLStore:
     
     def fetchall(self,stmt):
         with self.conn.cursor(cursor_factory=RealDictCursor) as c:
-            logging.info(f"fetching{stmt}")
+            logging.info(f"fetching {stmt}")
             c.execute(stmt)
             res=c.fetchall()
         return res
@@ -55,21 +56,31 @@ class SQLStore:
     def del_obj(self, table_name, pkey_name, uid): self.execute(f"delete * from {table_name} where {pkey_name}='{uid}'")
     def del_objs(self, table_name, pkey_name, uids):
         vals=",".join(f"'{uid}'" for uid in uids)
-        self.execute("delete * from {table_name} where {pkey_name} in ({vals})")
+        self.execute(f"delete from {table_name} where {pkey_name} in ({vals})")
     
     def fetch_refs(self, table_name, pkey_name, fkey_name,value):
-        res=self.fetchall(f"select {pkey_name} from {table_name} where '{fkey_name}'='{value}'")
-        return [r[0] for r in res]
+        res=self.fetchall(f"select {pkey_name} from {table_name} where {fkey_name}='{value}'")
+        return [r[pkey_name] for r in res]
+    
+    def del_refs(self,table_name,pkey_name,fkey_name, value):
+        uids=self.fetch_refs(table_name,pkey_name,fkey_name,value)
+        return self.del_objs(table_name,pkey_name,uids) if len(uids) else None
+    
+    def insert_obj(self,table_name, pkey_name,values):
+        values[pkey_name]=str(uuid.uuid4())
+        cols=",".join([k for k in values.keys()])
+        vals=",".join([f"'{v}'" for v in values.values()])
+        self.execute(f"insert into {table_name} ({cols}) VALUES ({vals})")
+        
+    def update_obj(self, table_name,pkey_name,values):
+        vals=",".join([f"{k}='{v}'" for k,v in values.items() if k!=pkey_name])
+        self.execute(f"update {table_name} SET {vals} where {pkey_name}='{values[pkey_name]}'")
     
     def insert_or_update_obj(self, table_name, pkey_name, values):
         if values.get(pkey_name,None):
-            vals=",".join([f"{k}='{v}'" for k,v in values.items() if k!=pkey_name])
-            self.execute(f"update {table_name} SET {vals} where {pkey_name}='{values[pkey_name]}'")
+            self.update_obj(table_name, pkey_name,values)
         else:
-            values[pkey_name]=str(uuid.uuid4())
-            cols=",".join([k for k in values.keys()])
-            vals=",".join([f"'{v}'" for v in values.values()])
-            self.execute(f"insert into {table_name} ({cols}) VALUES ({vals})")
+            self.insert_obj(table_name, pkey_name,values)
         return values[pkey_name]
             
     def create_db(self,db_name,overwrite=True):

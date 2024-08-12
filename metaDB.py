@@ -6,7 +6,7 @@ from pydantic import BaseModel
 user_info={"user_name":"John","user_role":"Fleet manager"}
 
 org_info={"org_name":"Egged",
-          "org_descr":"bus public transportation",
+          "org_descr":"bus public transportation company",
           "org_conn_str":"dbname='acmebus' user='taskanalytics' password='leningrad' host='localhost' port='5432'",
           "org_data_app":"telematics solution"}
 
@@ -56,11 +56,11 @@ class MetaDB:
         for task_uid in user_tasks_ids: self.delete_task(task_uid)
           
     def delete_task_kpis(self, task_uid):
-        task_kpis_ids=self.store.fetch_refs("kpis","kpi_uid", "kpi_task_uid", task_uid)
-        self.store.del_objs("kpis", "kpi_uid",task_kpis_ids)
+        self.store.del_refs("kpis", "kpi_uid","kpi_task_uid",task_uid)
         self.store.del_obj("task","task_uid",task_uid)
         
     def generate_user_tasks(self,user_uid):
+        self.delete_user_tasks(user_uid)
         user_info=self.store.fetch_obj("users","user_uid",user_uid)
         org_info=self.store.fetch_obj("orgs","org_uid",user_info['user_org_uid'])
         sys_msg="You are a helpful business analyst"
