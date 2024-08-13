@@ -1,5 +1,9 @@
 {
     "cSpell.words": [
-        "kpis"
+        "kpis",
+        "pydantic",
+        "pymysql",
+        "sqlalchemy",
+        "taskanalytics"
     ]
 }

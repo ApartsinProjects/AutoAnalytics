@@ -6,9 +6,7 @@ postgres_cfg={
 import psycopg2,logging, uuid
 from psycopg2.extras import RealDictCursor
 
-
-class SQLStore:
-    
+class PostGreStore:
     def __init__(self,cfg=postgres_cfg):
         self.cfg=cfg
         self.conn=None
@@ -16,6 +14,7 @@ class SQLStore:
     def close(self): 
         if self.conn is not None:
             logging.info("closing connection")
+            self.conn.commit()
             self.conn.close()
             self.conn=None
         return self
@@ -43,69 +42,62 @@ class SQLStore:
             res=c.fetchall()
         return res
     
-    def find_obj(self,table_name,pkey_name,criteria):
-        logging.info(f"find obj in {table_name} by {criteria}")
-        res=self.fetchall(f"select {pkey_name} from {table_name} where {criteria}")
-        return res[0][pkey_name] if len(res) else None
-    
-    def fetch_obj(self,table_name,pkey_name,uid):
-        logging.info(f"find obj in {table_name} by {uid}")
-        res=self.fetchall(f"select * from {table_name} where {pkey_name}='{uid}'")
+    def find_objs(self,table_name,criteria):
+        logging.info(f"find objs in {table_name} by {criteria}")
+        return self.fetchall(f"select * from {table_name} where {criteria}")
+        
+    def find_obj(self,table_name,criteria):
+        res=self.find_objs(table_name,criteria)
         return res[0] if len(res) else None
     
+    def find_obj_id(self,table_name,pkey_name,criteria):
+        res=self.find_obj(table_name,criteria)
+        return res[pkey_name] if res else None
+      
+    def fetch_obj(self,table_name,pkey_name,uid):
+        logging.info(f"find obj in {table_name} by {uid}")
+        return self.find_obj(table_name,f"{pkey_name}='{uid}'")
+    
+    def fetch_obj_id(self,table_name,pkey_name,uid):
+        return self.find_obj_id(table_name,pkey_name,f"{pkey_name}='{uid}'")
+    
+    def fetch_refs(self, table_name, fkey_name,value):
+        res=self.fetchall(f"select * from {table_name} where {fkey_name}='{value}'")
+        return res
+        
     def del_obj(self, table_name, pkey_name, uid): self.execute(f"delete * from {table_name} where {pkey_name}='{uid}'")
+    def del_refs(self,table_name,fkey_name, value):return self.execute(f"delete from {table_name} where {fkey_name}='{value}'")
     def del_objs(self, table_name, pkey_name, uids):
         vals=",".join(f"'{uid}'" for uid in uids)
         self.execute(f"delete from {table_name} where {pkey_name} in ({vals})")
-    
-    def fetch_refs(self, table_name, pkey_name, fkey_name,value):
-        res=self.fetchall(f"select {pkey_name} from {table_name} where {fkey_name}='{value}'")
-        return [r[pkey_name] for r in res]
-    
-    def del_refs(self,table_name,pkey_name,fkey_name, value):
-        uids=self.fetch_refs(table_name,pkey_name,fkey_name,value)
-        return self.del_objs(table_name,pkey_name,uids) if len(uids) else None
     
     def insert_obj(self,table_name, pkey_name,values):
         values[pkey_name]=str(uuid.uuid4())
         cols=",".join([k for k in values.keys()])
         vals=",".join([f"'{v}'" for v in values.values()])
         self.execute(f"insert into {table_name} ({cols}) VALUES ({vals})")
+        return values
+        
+    def insert_objs(self, table_name,pkey_name,values_list):
+        for values in values_list: self.insert_obj(table_name,pkey_name,values)
+        return values
+        
+    def insert_objs_batch(self, table_name,pkey_name,values_list):
+        for values in values_list: values[pkey_name]=str(uuid.uuid4())
+        col_names=",".join(k for k in values_list[0].keys())
+        vals=[','.join([f"'{v}'" for v in c.values()]) for c in values_list]
+        mvals=",".join(f"({v})" for v in vals)
+        self.execute(f"insert into {table_name} ({col_names}) values {mvals}")
+        return values_list
         
     def update_obj(self, table_name,pkey_name,values):
         vals=",".join([f"{k}='{v}'" for k,v in values.items() if k!=pkey_name])
         self.execute(f"update {table_name} SET {vals} where {pkey_name}='{values[pkey_name]}'")
+        return values
     
     def insert_or_update_obj(self, table_name, pkey_name, values):
         if values.get(pkey_name,None):
             self.update_obj(table_name, pkey_name,values)
         else:
             self.insert_obj(table_name, pkey_name,values)
-        return values[pkey_name]
-            
-    def create_db(self,db_name,overwrite=True):
-        if overwrite: self.drop_db(db_name)
-        return self.connect().execute(f"create database {db_name}").connect(db_name)
-        
-    def drop_db(self,db_name):
-        if self.is_db_exist(db_name):
-            logging.info(f"dropping db {db_name}")
-            self.connect().execute(f"drop database {db_name} WITH (FORCE)").connect(None)
-        return self
-        
-    def is_db_exist(self,db_name):
-        return self.fetchall(f"select exists(SELECT datname FROM pg_catalog.pg_database WHERE datname='{db_name}')")[0][0]
-        
-    def fetch_columns(self,table_name):
-        return self.fetchall(f"SELECT column_name,data_type FROM information_schema.columns WHERE table_name = '{table_name}'")
-    
-    def fetch_tables(self):
-        return self.fetchall("SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname != 'pg_catalog' AND schemaname != 'information_schema'")
-    
-    
-        
- 
-        
-        
-        
-        
+        return values
