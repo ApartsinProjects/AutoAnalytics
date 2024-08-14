@@ -17,7 +17,7 @@ class TaskGen:
         
     def generate_user_tasks(self,user_uid):
         self.mngDB.delete_user_tasks(user_uid)
-        user_info,org_info,=self.describe_user(user_uid)
+        user_info,org_info,tasks=self.mngDB.describe_user(user_uid)
         sys_msg="You are a helpful business analyst"
         user_msg=f"Describe job responsibilities and tasks for each responsibility for job role:'{user_info['user_role']}' at {org_info['org_descr']}"
         role_responsibilities=self.llm.struct_query(sys_msg, user_msg,RoleResponsibilities)

@@ -95,6 +95,10 @@ class PostGreStore:
         self.execute(f"update {table_name} SET {vals} where {pkey_name}='{values[pkey_name]}'")
         return values
     
+    def update_objs(self, table_name,pkey_name,values_list):
+        for v in values_list: self.update_obj(table_name,pkey_name,v)
+        return values_list
+    
     def insert_or_update_obj(self, table_name, pkey_name, values):
         if values.get(pkey_name,None):
             self.update_obj(table_name, pkey_name,values)

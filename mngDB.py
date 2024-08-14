@@ -9,14 +9,17 @@ class MngDB:
         
     def describe_user(self, user_uid):
         user_info=self.get_obj("user",user_uid)
-        org_info=self.get_obj("org","org_uid",user_info["user_org_uid"]) if user_info else None
+        org_info=self.get_obj("org",user_info["user_org_uid"]) if user_info else None
         tasks=self.store.fetch_refs("tasks","task_user_uid",user_uid) if user_info else None
         return user_info,org_info,tasks
 
+    def update_obj(self,obj_type,value): return self.store.update_obj(obj_type+"s",obj_type+"_uid",value)
+    def update_objs(self,obj_type,values):return self.store.update_objs(obj_type+"s",obj_type+"_uid",values)
     def get_org_tables(self,org_uid): return self.store.fetch_refs("tables","table_org_uid",org_uid)
     def get_table_columns(self, table_uid): return self.store.fetch_refs("cols","col_table_uid",table_uid)
     def get_obj(self,obj_type,uid): return self.store.fetch_obj(obj_type+"s",obj_type+"_uid",uid)
-    def get_user_kpis(self, user_uid):
+    def get_user_org(self): return self.store.get_obj("orgs")
+    def get_user_kpis_ids(self, user_uid):
         res=self.store.fetchall(f"select kpis.kpi_uid from kpis join tasks on kpis.kpi_task_uid=tasks.task_uid where tasks.task_user_uid='{user_uid}'")
         return [r["kpi_uid"] for r in res]
     def create_objs_batch(self,obj_type,values): return self.store.insert_objs_batch(obj_type+"s",obj_type+"_uid",values)
@@ -49,7 +52,7 @@ class MngDB:
         self.delete_user_tasks(user_uid)
         self.store.del_obj("users", "user_uid",user_uid)       
    
-    def delete_task_kpis(self, task_uid): self.store.del_refs("kpis", "kpi_uid","kpi_task_uid",task_uid)     
+    def delete_task_kpis(self, task_uid): self.store.del_refs("kpis","kpi_task_uid",task_uid)     
     def delete_task(self, task_uid): 
         self.delete_task_kpis(task_uid)
         self.store.del_obj("tasks", "task_uid",task_uid)   
@@ -59,7 +62,7 @@ class MngDB:
         for user in org_users: self.delete_user(user['user_uid'])
         
     def delete_user_tasks(self, user_uid):
-        user_tasks=self.store.fetch_refs("tasks","task_uid","task_user_uid",user_uid)
+        user_tasks=self.store.fetch_refs("tasks","task_user_uid",user_uid)
         for task in user_tasks: self.delete_task(task['task_uid'])
         
     def create_or_update_task(self, task_info):self.store.insert_or_update_obj("tasks","task_uid",task_info)
