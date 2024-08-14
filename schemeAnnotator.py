@@ -45,6 +45,11 @@ class SchemeAnnotator:
          self.mngDB=MngDB()
          self.llm=LLMAgent()
          self.remote_ds=DataSource()
+    
+    def prepare_schema(self,org_uid):
+        self.fetch_schema(org_uid)
+        self.enrich_schema(org_uid)
+        self.summarize_scheme(org_uid)
          
     def fetch_schema(self, org_uid):
         self.mngDB.delete_org_scheme(org_uid)
@@ -78,10 +83,12 @@ class SchemeAnnotator:
         scheme_prompt=SchemePrompt().get_schema_prompt(org_info['org_uid'])
         sys_msg=f"You are database developer trying to guess semantics of the data store based on column and table names.\
             You know that the database belong to organization:'{org_info['org_descr']}' and its collected by '{org_info['org_data_app']}'"
-        user_msg=f"try to guess useful information about the semantics of tables and columns based on\
+        user_msg=f"Try to guess useful information about the semantics of tables and columns based on\
             the following basic list fo tables and columns and their types:{scheme_prompt}.\
-            Generate descriptions, and meaningful aliases for table and column names based on possible abbreviations and non-English words in their names.\
-            Separate descriptive annotation and justification on why certain alias or description has been selected or guessed"
+                Generate meaningful self-explanatory English Upper Camel Case aliases for tables and columns names.\
+                    If needed, decipher possible abbreviations and non-English words in the original names.\
+                        Generate descriptions for each column and table.\
+                            Separate descriptive columns nd tables annotations from the justifications on why certain alias or description has been selected or guessed"
         data_scheme=self.llm.struct_query(sys_msg,user_msg,DataScheme)
         for table in data_scheme.tables: self.update_scheme(table,org_uid)
     

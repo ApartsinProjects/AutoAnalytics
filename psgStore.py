@@ -61,6 +61,10 @@ class PostGreStore:
     def fetch_obj_id(self,table_name,pkey_name,uid):
         return self.find_obj_id(table_name,pkey_name,f"{pkey_name}='{uid}'")
     
+    def fetch_parent_obj(self,obj_type, parent_obj_type, value):
+        obj=self.fetch_obj(obj_type+"s",obj_type+"_uid", value)
+        return self.fetch_obj(parent_obj_type+"s",parent_obj_type+"_uid", obj[obj_type+"_"+parent_obj_type+"_uid"]) if obj else None
+       
     def fetch_refs(self, table_name, fkey_name,value):
         res=self.fetchall(f"select * from {table_name} where {fkey_name}='{value}'")
         return res

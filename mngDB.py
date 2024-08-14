@@ -18,7 +18,7 @@ class MngDB:
     def get_org_tables(self,org_uid): return self.store.fetch_refs("tables","table_org_uid",org_uid)
     def get_table_columns(self, table_uid): return self.store.fetch_refs("cols","col_table_uid",table_uid)
     def get_obj(self,obj_type,uid): return self.store.fetch_obj(obj_type+"s",obj_type+"_uid",uid)
-    def get_user_org(self): return self.store.get_obj("orgs")
+    def get_user_org(self,user_uid): return self.store.fetch_parent_obj("user","org",user_uid)
     def get_user_kpis_ids(self, user_uid):
         res=self.store.fetchall(f"select kpis.kpi_uid from kpis join tasks on kpis.kpi_task_uid=tasks.task_uid where tasks.task_user_uid='{user_uid}'")
         return [r["kpi_uid"] for r in res]

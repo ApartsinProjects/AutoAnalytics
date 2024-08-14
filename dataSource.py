@@ -29,7 +29,9 @@ class DataSource:
         
     def fetch_tables(self):return inspect(self.engine).get_table_names()
     def fetch_columns(self,table_name="nesreca"): return inspect(self.engine).get_columns(table_name)
-    def fetchall(self, statement):return self.execute(statement).mappings().all()
+    def fetchall(self, statement):
+        res=self.execute(statement).mappings().all()
+        return [dict(r) for r in res] if res else None
     def execute(self,statement): return self.conn.execute(text(statement))
     def fetch_samples(self,table_name,num_samples=3): return self.fetchall(f"select * from {table_name} LIMIT {num_samples}")
     
