@@ -46,7 +46,7 @@ class SQLGen:
         self.user_info,self.org_info,tasks=self.mngDB.describe_user(user_uid)
         self.prepare_source(self.user_info['user_org_uid'])
         
-        sys_msg= sys_msg=f"you are a senior MySQL  developer responsible for implementing SQL statements for computing KPIs based on KPI's specification and\
+        sys_msg= sys_msg=f"you are a senior MySQL developer responsible for implementing SQL statements for computing KPIs based on KPI's specification and\
             the following description of the available database tables and columns:{SchemePrompt().get_rich_schema_prompt(self.user_info['user_org_uid'])}"
        
         user_kpis=self.mngDB.get_user_kpis_ids(user_uid)
@@ -56,7 +56,7 @@ class SQLGen:
         self.user_info,self.org_info,tasks=self.mngDB.describe_user(user_uid)
         self.prepare_source(self.user_info['user_org_uid'])
         
-        sys_msg= sys_msg=f"you are a senior MySQL  developer responsible for implementing SQL statements for computing KPIs based on KPI's specification and\
+        sys_msg= sys_msg=f"you are a senior MySQL developer responsible for implementing SQL statements for computing KPIs based on KPI's specification and\
             the following description of the available database tables and columns:{SchemePrompt().get_annotated_schema_prompt(self.user_info['user_org_uid'])}"
        
         user_kpis=self.mngDB.get_user_kpis_ids(user_uid)

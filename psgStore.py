@@ -40,6 +40,7 @@ class PostGreStore:
         with self.conn.cursor(cursor_factory=RealDictCursor) as c:
             c.execute(stmt)
             res=c.fetchall()
+            res=[dict(r) for r in res] if res else None
         logging.info(f"fetch {stmt} with nrows:{len(res) if res else 0}")
         return res
     
