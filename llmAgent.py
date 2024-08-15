@@ -6,7 +6,7 @@ agent_cfg={'model':"gpt-4o-mini",
            }
 
 from openai import OpenAI
-import copy
+import copy,logging
 
 class LLMAgent:
     
@@ -20,6 +20,7 @@ class LLMAgent:
             model=self.cfg['model'],temperature=self.cfg['temperature'],
             messages=[{"role": "system", "content": sys_msg},{"role": "user", "content": user_msg}],
             response_format=fmt_class)
+        logging.info(f"llm retunr={completion.choices[0].message.parsed}")
         return completion.choices[0].message.parsed
     
     

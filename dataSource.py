@@ -1,4 +1,5 @@
 from sqlalchemy import create_engine, inspect,text # type: ignore
+from sqlalchemy.exc import SQLAlchemyError
 import logging
 
 def destroy(obj,destructor_fn):
@@ -28,11 +29,30 @@ class DataSource:
         return self
         
     def fetch_tables(self):return inspect(self.engine).get_table_names()
+    def fetch_table_pkeys(self,table_name): return inspect(self.engine).get_pk_constraint(table_name)
+    def fetch_table_fkeys(self,table_name): return inspect(self.engine).get_foreign_keys(table_name)
+        
     def fetch_columns(self,table_name="nesreca"): return inspect(self.engine).get_columns(table_name)
     def fetchall(self, statement):
         res=self.execute(statement).mappings().all()
         return [dict(r) for r in res] if res else None
     def execute(self,statement): return self.conn.execute(text(statement))
+    
+    def fetchall_with_diagnostics(self, statement):
+        res,error=self.execute_with_diagnostics(statement)
+        res=[dict(r) for r in res.mappings().all()] if res else None
+        return res,error
+    
+    def execute_with_diagnostics(self,stmt):
+        error,res=None,None
+        try:
+            res=self.conn.execute(text(stmt))
+        except SQLAlchemyError as e:
+            logging.info(f"exception {e} during execution of {stmt}")
+            error=str(e.__dict__['orig'])
+            logging.info(f"error executing {stmt} with {error}")
+        return res,error
+    
     def fetch_samples(self,table_name,num_samples=3): return self.fetchall(f"select * from {table_name} LIMIT {num_samples}")
     
     def create_db(self,db_name,overwrite=True):

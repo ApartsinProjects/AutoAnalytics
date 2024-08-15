@@ -36,10 +36,11 @@ class PostGreStore:
         return self
     
     def fetchall(self,stmt):
+        res=None
         with self.conn.cursor(cursor_factory=RealDictCursor) as c:
-            logging.info(f"fetching {stmt}")
             c.execute(stmt)
             res=c.fetchall()
+        logging.info(f"fetch {stmt} with nrows:{len(res) if res else 0}")
         return res
     
     def find_objs(self,table_name,criteria):
@@ -69,7 +70,7 @@ class PostGreStore:
         res=self.fetchall(f"select * from {table_name} where {fkey_name}='{value}'")
         return res
         
-    def del_obj(self, table_name, pkey_name, uid): self.execute(f"delete * from {table_name} where {pkey_name}='{uid}'")
+    def del_obj(self, table_name, pkey_name, uid): self.execute(f"delete from {table_name} where {pkey_name}='{uid}'")
     def del_refs(self,table_name,fkey_name, value):return self.execute(f"delete from {table_name} where {fkey_name}='{value}'")
     def del_objs(self, table_name, pkey_name, uids):
         vals=",".join(f"'{uid}'" for uid in uids)

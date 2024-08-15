@@ -6,14 +6,14 @@ from mngDB import MngDB,sql_text
 from schemePrompt import SchemePrompt
 
 class ColumnMetadata(BaseModel):
-    column_name: str 
+    original_column_name: str #make it a key so there is no choice
     column_type: str
     column_units: str
     column_description: str
     column_alias: str
     column_annotation_justification:str
-    def ddl(self): return f"{self.column_name} {self.column_type}"
-    def display(self): print(f"\t{self.column_name:20}\t{self.column_type:10}\t{self.column_units:10}\t{self.column_description}")
+    def ddl(self): return f"{self.original_column_name} {self.column_type}"
+    def display(self): print(f"\t{self.original_column_name:20}\t{self.column_type:10}\t{self.column_units:10}\t{self.column_description}")
     
 class TableMetadata(BaseModel):
     table_name: str
@@ -39,6 +39,8 @@ class DBContentSummary(BaseModel):
     
 def collect_key(dict_list, key): return [v[key] for v in dict_list]
 def samples_str(dict_list,key): return ",".join([str(v) for v in collect_key(dict_list,key)])
+def alias_col_wrap(col_name): return col_name.replace(" ","_")
+
                   
 class SchemeAnnotator:
     def __init__(self):
@@ -56,12 +58,18 @@ class SchemeAnnotator:
         org_info=self.mngDB.get_obj("org",org_uid)
         self.remote_ds.connect_str(org_info["org_conn_str"])
         tables=self.remote_ds.fetch_tables()
-        tables_info=self.mngDB.create_objs_batch("table",[{'table_name':table,"table_org_uid":org_uid} for table in tables])
+        tables_info=self.mngDB.create_objs_batch("table",
+                [{'table_name':table,
+                  "table_org_uid":org_uid,
+                  "table_pkeys":sql_text(json.dumps(self.remote_ds.fetch_table_pkeys(table))),
+                  "table_fkeys":sql_text(json.dumps(self.remote_ds.fetch_table_fkeys(table))),
+                  }
+                  for table in tables])
         for table in tables_info: self.insert_cols(table,self.remote_ds.fetch_columns(table['table_name']),self.remote_ds.fetch_samples(table['table_name']),org_uid)
             
     def insert_cols(self,table,cols,samples,org_uid):
-        col_dict=[{'col_name':c['name'],'col_type':c['type'],"col_table_uid":table['table_uid'],
-                   "col_comment":c['comment'],'col_default':c['default'],
+        col_dict=[{'col_name':c['name'].lower(),'col_type':c['type'],"col_table_uid":table['table_uid'],
+                   "col_comment":c['comment'],
                    "col_sample_vals":samples_str(samples,c['name'])} for c in cols]
         return self.mngDB.create_objs_batch("col",col_dict)
     
@@ -83,20 +91,18 @@ class SchemeAnnotator:
         scheme_prompt=SchemePrompt().get_schema_prompt(org_info['org_uid'])
         sys_msg=f"You are database developer trying to guess semantics of the data store based on column and table names.\
             You know that the database belong to organization:'{org_info['org_descr']}' and its collected by '{org_info['org_data_app']}'"
-        user_msg=f"Try to guess useful information about the semantics of tables and columns based on\
+        user_msg=f"try to guess useful information about the semantics of tables and columns based on\
             the following basic list fo tables and columns and their types:{scheme_prompt}.\
-                Generate meaningful self-explanatory English Upper Camel Case aliases for tables and columns names.\
-                    If needed, decipher possible abbreviations and non-English words in the original names.\
-                        Generate descriptions for each column and table.\
-                            Separate descriptive columns nd tables annotations from the justifications on why certain alias or description has been selected or guessed"
+                Generate descriptions and longer meaningful English alias names for the original table and column names.\
+                    Separate descriptive annotation and reasoning on why your guesses are reasonable"
         data_scheme=self.llm.struct_query(sys_msg,user_msg,DataScheme)
         for table in data_scheme.tables: self.update_scheme(table,org_uid)
     
     def update_scheme(self,table,org_uid):
-        table_info={"table_org_uid":org_uid, "table_name":table.table_name,"table_alias":table.table_alias,
+        table_info={"table_org_uid":org_uid, "table_name":table.table_name.lower(),"table_alias":alias_col_wrap(table.table_alias),
                     "table_desc":sql_text(table.table_description),"table_desc_justification":sql_text(table.table_annotation_justification)}
-        table_info=self.mngDB.find_update_obj("table",f"table_name='{table.table_name}' and table_org_uid='{org_uid}'",table_info)
+        table_info=self.mngDB.find_update_obj("table",f"table_name='{table.table_name.lower()}' and table_org_uid='{org_uid}'",table_info)
         for col in table.table_columns:
-            col_info={"col_name":col.column_name,"col_units":col.column_units,"col_desc":sql_text(col.column_description),
-                      "col_alias":col.column_alias,"col_desc_justification":sql_text(col.column_annotation_justification),"col_table_uid":table_info['table_uid']}
-            col_info=self.mngDB.find_update_obj("col",f"col_name='{col.column_name}' and col_table_uid='{table_info['table_uid']}'",col_info)
+            col_info={"col_name":col.original_column_name.lower(),"col_units":col.column_units,"col_desc":sql_text(col.column_description),
+                      "col_alias":alias_col_wrap(col.column_alias),"col_desc_justification":sql_text(col.column_annotation_justification),"col_table_uid":table_info['table_uid']}
+            col_info=self.mngDB.find_update_obj("col",f"col_name='{col.original_column_name.lower()}' and col_table_uid='{table_info['table_uid']}'",col_info)

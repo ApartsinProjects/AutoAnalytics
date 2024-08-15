@@ -1,5 +1,5 @@
 from llmAgent import LLMAgent
-from mngDB import MngDB
+from mngDB import MngDB,sql_text
 from pydantic import BaseModel # type: ignore
 
 #generate job role responsibilities and tasks for each generated responsibility
@@ -26,6 +26,6 @@ class TaskGen:
     def insert_tasks(self, responsibilities, user_uid):
         for responsibility in responsibilities:
             for task in responsibility.responsibility_tasks:
-                task_info={"task_name":task,"task_responsibility": responsibility.job_responsibility, "task_user_uid":user_uid}
+                task_info={"task_name":sql_text(task),"task_responsibility": sql_text(responsibility.job_responsibility), "task_user_uid":user_uid}
                 self.mngDB.create_or_update_task(task_info)
     

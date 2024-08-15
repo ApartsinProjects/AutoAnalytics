@@ -15,40 +15,51 @@ class SQLChecker:
         self.cols=None
         
     def test_kpis(self, user_uid):
-        user_org=self.mngDB.get_user_org(user_uid)
+        self.prepare_test_round(user_uid)
+        org_kpis_uids=self.mngDB.get_user_kpis_ids(user_uid)
+        for kpi_uid in org_kpis_uids:self.test_kpi(kpi_uid)
         
+    def prepare_test_round(self,user_uid):
+        user_org=self.mngDB.get_user_org(user_uid)
         self.tables=self.mngDB.get_org_tables(user_org['org_uid'])
         self.cols={table['table_uid']:self.mngDB.get_table_columns(table['table_uid']) for table in self.tables}
-        
-        org_kpis_uids=self.mngDB.get_user_kpis_ids(user_uid)
         self.remote.connect_str(user_org["org_conn_str"])
-        for kpi_uid in org_kpis_uids:self.test_kpi(kpi_uid)
+        return self
+        
+    def decode_results(self,src_res):
+        if src_res:
+            if len(src_res)>10: src_res=src_res[:10]
+            decoded_res,key_map=self.encode_results_aliases(src_res) 
+            return json.dumps(src_res,default=str),json.dumps(decoded_res,default=str),key_map
+        else:
+            return None,None,None
         
     def test_kpi(self,kpi_uid):
         kpi_info=self.mngDB.get_obj("kpi",kpi_uid)
+        stmt,src_res,error=self.test_kpi_info(kpi_info)
+        self.save_results(stmt,kpi_uid,src_res,error)
+        
+    def test_kpi_info(self,kpi_info):
         stmt=kpi_info['sql_stmt'].replace('@periodStart',self.period['testStartPeriod']).replace('@periodEnd',self.period['testEndPeriod'])
-        src_res_json,decoded_res_json,key_map=None,None,None
-        try:
-            src_res=self.remote.fetchall(stmt,)
-            if len(src_res)>10: src_res=src_res[:10]
-            decoded_res,key_map=self.encode_results_aliases(src_res) if src_res else None
-            src_res_json,decoded_res_json=json.dumps(src_res,default=str),json.dumps(decoded_res,default=str)
-        except:
-            pass
-        finally:
-            self.save_results(kpi_uid,src_res_json,decoded_res_json,key_map)
-            
-    def save_results(self, kpi_uid, src_json,decoded_json,key_map):
-        kpi_info={'kpi_uid':kpi_uid,
-                  "sql_passed":"true" if decoded_json else "false",
-                  "sql_test_time":f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"}
-        if decoded_json:
-            kpi_info["sql_results"]=sql_text(decoded_json)
-            kpi_info["sql_results_raw"]=sql_text(src_json)
+        src_res,error=self.remote.fetchall_with_diagnostics(stmt)
+        return stmt,src_res,error
+        
+    def append_decoded(self,kpi_info,src_res):
+        src_res_json,decoded_res_json,key_map=self.decode_results(src_res) 
+        if decoded_res_json: 
+            kpi_info["sql_passed"]="true" 
+            kpi_info["sql_results"]=sql_text(decoded_res_json)
+            kpi_info["sql_results_raw"]=sql_text(src_res_json)
             kpi_info['sql_res_cols_raw']=sql_text(json.dumps(list(key_map.keys())))
             kpi_info['sql_res_cols_alias']=sql_text(json.dumps(list(key_map.values())))
             kpi_info['sql_col_map']=sql_text(json.dumps(key_map))
-        self.mngDB.update_obj("kpi",kpi_info)
+        return kpi_info
+            
+    def save_results(self, stmt,kpi_uid, src_res,error):
+        kpi_info={'kpi_uid':kpi_uid,"sql_passed":"false",
+                  "sql_test_time":f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                  'sql_test_stmt':sql_text(stmt),'sql_error':sql_text(error) if error else "OK"}
+        self.mngDB.update_obj("kpi",self.append_decoded(kpi_info,src_res))
             
     def map_keys(self,rec):
         all_keys=dict(zip(rec.keys(),rec.keys()))
