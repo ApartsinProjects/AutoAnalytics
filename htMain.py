@@ -96,20 +96,18 @@ class MainPage:
         org=self.mngDB.store.fetchall(f"select orgs.* from orgs join users on orgs.org_uid=users.user_org_uid join tasks on users.user_uid=tasks.task_user_uid where tasks.task_uid='{kpi['kpi_task_uid']}'")[0]
         
         #return str(kpi)
-        return self.kpi_header(kpi),self.res_head(kpi['sql_results_raw']),self.sql_head(kpi,org)
+        return self.kpi_header(kpi),self.res_head(kpi['sql_results_raw'],kpi['sql_vis']),Button("Refresh")
     
     def kpi_header(self,kpi): return  H1(""+kpi['kpi_name']+f"(fetched on {kpi['sql_test_time']})"),H4(kpi['kpi_description']) 
     
-    def sql_head(self,kpi,org):
-        return H1("[AI] SQL:"),Div(kpi['sql_stmt']),Div(H2("Data connection string"),org['org_conn_str']),P(),Button("Refresh")
-    
-    def res_head(self,sql_results):
+ 
+    def res_head(self,sql_results,vis_div):
         if len(sql_results)==0: return Div("empty")
         
         header_row=Tr(*[Td(k,style="font-weight:bold") for k in sql_results[0].keys()])
         data_rows=[]
         for r in sql_results:data_rows.append(Tr(*[Td(v) for v in r.values()]))
-        return Table(header_row, *data_rows ,border=1),P()
+        return P(),NotStr(vis_div),P(),P(),Table(header_row, *data_rows ,border=1)
     
 
 

@@ -1,16 +1,16 @@
 1. [done] HTML: Add Task column to KPIs
 2. [done] HTML: Separate user info and AI-generated analytics
-3. HTML: add scheme page
+3. [done] HTML: add scheme page
 4. Gen: Add D3 Visualization
-5. Gen: Add explanations
+5. Gen: Add result explanations
 6. Gen: Add real-time query
 7. Fixes: Results +50 len, better names and description of users/orgs 
-8. More Datasets samples
-9. Different roles for the same dataset example
+8. More databases and use cases for demo
+9. Different roles demo for the same dataset example
 10. Duplicate removal
 11. Zero-size results sets filter
 12. Try with higher temperature
-13. HTML style
+13. [done] HTML style
 14. Rest Interface
 15. Public Datasets
 16. Hide/Show KPIs

@@ -42,8 +42,9 @@ class MngDB:
     
     def delete_org_scheme(self,org_uid):
         tables=self.store.fetch_refs("tables","table_org_uid",org_uid)
-        for table in tables: self.store.del_refs("cols","col_table_uid",table['table_uid'])
-        self.store.del_refs("tables","table_org_uid",org_uid)
+        if tables:
+            for table in tables: self.store.del_refs("cols","col_table_uid",table['table_uid'])
+            self.store.del_refs("tables","table_org_uid",org_uid)
         
     def delete_org(self,org_uid):
         self.delete_org_scheme()

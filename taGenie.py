@@ -5,6 +5,7 @@ from kpiGen import KPIGen
 from sqlGen import SQLGen
 from sqlChecker import SQLChecker
 from userReport import UserReport
+from visGen import VisGen
 import logging
 
 class TAGenie:
@@ -19,6 +20,7 @@ class TAGenie:
         self.test_queries(user_info['user_uid'])
         self.print_user_report(user_info['user_uid'])
         self.attempt_fix_sqls(user_info['user_uid'])
+        self.generate_visuals(user_info['user_uid'])
         self.print_user_report(user_info['user_uid'])
         
     def provision_user(self,user_info,org_info): 
@@ -53,5 +55,9 @@ class TAGenie:
     def attempt_fix_sqls(self,user_uid):
         logging.info(f"\n============================ attempting to debug and fix queries =======================================================\n")
         return SQLGen().attempt_fix_sqls(user_uid)
+    
+    def generate_visuals(self,user_uid):
+        logging.info(f"\n============================ generating visuals =======================================================\n")
+        return VisGen().generate_user_visuals(user_uid)
         
         

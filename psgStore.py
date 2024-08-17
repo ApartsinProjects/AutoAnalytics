@@ -50,7 +50,7 @@ class PostGreStore:
         
     def find_obj(self,table_name,criteria):
         res=self.find_objs(table_name,criteria)
-        return res[0] if len(res) else None
+        return res[0] if res and len(res) else None
     
     def find_obj_id(self,table_name,pkey_name,criteria):
         res=self.find_obj(table_name,criteria)

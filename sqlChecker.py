@@ -4,6 +4,7 @@ from datetime import datetime
 import copy,json
 
 def remap_dict(d,key_map): return {key_map[k]:v for k,v in d.items()}
+max_num_records=100
 
 class SQLChecker:
     def __init__(self):
@@ -28,7 +29,7 @@ class SQLChecker:
         
     def decode_results(self,src_res):
         if src_res:
-            if len(src_res)>10: src_res=src_res[:10]
+            if len(src_res)>max_num_records: src_res=src_res[:max_num_records]
             decoded_res,key_map=self.encode_results_aliases(src_res) 
             return json.dumps(src_res,default=str),json.dumps(decoded_res,default=str),key_map
         else:
@@ -56,6 +57,7 @@ class SQLChecker:
         return kpi_info
             
     def save_results(self, stmt,kpi_uid, src_res,error):
+        if len(src_res)==0: error="sql query returned empty table"
         kpi_info={'kpi_uid':kpi_uid,"sql_passed":"false",
                   "sql_test_time":f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
                   'sql_test_stmt':sql_text(stmt),'sql_error':sql_text(error) if error else "OK"}

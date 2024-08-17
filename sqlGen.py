@@ -2,7 +2,7 @@ from llmAgent import LLMAgent
 from mngDB import MngDB,sql_text
 from pydantic import BaseModel
 from schemePrompt import SchemePrompt
-from sqlChecker import SQLChecker
+from sqlChecker import SQLChecker,max_num_records
 import json,re,logging
 from datetime import datetime
 
@@ -118,7 +118,7 @@ class SQLGen:
         
     def update_fixed_sql(self, kpi_uid, new_stmt,new_test_stmt,new_res):
         logging.info(f"fixed SQL statement for kpi={kpi_uid}")
-        if len(new_res)>10: new_res=new_res[:10]
+        if len(new_res)>max_num_records: new_res=new_res[:max_num_records]
         self.mngDB.update_obj("kpi",{   "kpi_uid":kpi_uid,"sql_error":"OK","sql_passed":"true","sql_fixed":"true",
                                         "sql_stmt":sql_text(new_stmt),
                                         "sql_test_stmt":sql_text(new_test_stmt),
@@ -136,11 +136,12 @@ class SQLGen:
                         Use @periodStart and @periodEnd as user-defined variables in the statement for defining the aggregation period."
             last_stmt=self.llm.struct_query(sys_msg,user_msg,SQLFixedQuery).fixed_sql_statement
             last_test_stmt, last_res, last_error=checker.test_kpi_info({**kpi,**{'sql_stmt':last_stmt}})
-            if last_error is None: 
+            if (last_error is None) and len(last_res)!=0: 
                 logging.info(f"after {max_attempts-left_attempts} fixed sql for kpi:{kpi['kpi_uid']} with original error {kpi['sql_error']}")
                 self.update_fixed_sql(kpi['kpi_uid'],last_stmt, last_test_stmt,last_res)
                 break
-            
+            else:
+                if len(last_res)==0: last_error="sql query returned empty table"
         if last_error: logging.info(f"after {max_attempts-left_attempts} for kpi:{kpi['kpi_uid']} error remains {kpi['sql_error']}")
         return last_error==None
                                     
