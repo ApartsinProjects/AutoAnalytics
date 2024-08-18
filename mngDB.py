@@ -1,7 +1,7 @@
 from psgStore import PostGreStore
 import logging
 
-def sql_text(s): return s.replace("'","''")
+def sql_text(s): return s.replace("'","''") if s else None
 
 class MngDB:
     def __init__(self):
@@ -62,11 +62,13 @@ class MngDB:
         
     def delete_org_users(self,org_uid): 
         org_users=self.store.fetch_refs("users","user_uid","user_org_id",org_uid)
-        for user in org_users: self.delete_user(user['user_uid'])
+        if org_users:
+            for user in org_users: self.delete_user(user['user_uid'])
         
     def delete_user_tasks(self, user_uid):
         user_tasks=self.store.fetch_refs("tasks","task_user_uid",user_uid)
-        for task in user_tasks: self.delete_task(task['task_uid'])
+        if user_tasks:
+            for task in user_tasks: self.delete_task(task['task_uid'])
         
     def create_or_update_task(self, task_info):self.store.insert_or_update_obj("tasks","task_uid",task_info)
                 

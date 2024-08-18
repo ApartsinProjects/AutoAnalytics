@@ -1,6 +1,17 @@
-from sqlalchemy import create_engine, inspect,text # type: ignore
+from sqlalchemy import create_engine, inspect ,event,Engine,text # type: ignore
+from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 import logging
+from sqlalchemy.event import listen
+
+statement_timeout=20 #in seconds
+
+@event.listens_for(Engine, "before_cursor_execute")
+def _set_timeout(conn, cursor, stmt, params, context, executemany):
+    timeout = context.execution_options.get('timeout', None)
+    if timeout: 
+        cursor.execute(f"SET SESSION MAX_EXECUTION_TIME={timeout*1000}")
+        logging.info(f"setting cursor timeout {timeout} sec")
 
 def destroy(obj,destructor_fn):
     if not isinstance(destructor_fn,list): destructor_fn=[destructor_fn]
@@ -36,24 +47,34 @@ class DataSource:
     def fetchall(self, statement):
         res=self.execute(statement).mappings().all()
         return [dict(r) for r in res] if res else None
+    
     def execute(self,statement): return self.conn.execute(text(statement))
     
-    def fetchall_with_diagnostics(self, statement):
-        res,error=self.execute_with_diagnostics(statement)
-        res=[dict(r) for r in res.mappings().all()] if res else None
+    def fetchall_with_diagnostics(self, statement, max_records=None):
+        res,error=self.execute_with_diagnostics(statement,max_records)
+        if max_records:
+            res=[dict(r) for r in res.mappings().fetchmany(max_records)] if res else None
+        else:
+            res=[dict(r) for r in res.mappings().all()] if res else None
+        if error: logging.info(f"fetch error {error}")
         return res,error
     
-    def execute_with_diagnostics(self,stmt):
+    def inject_limit(self,stmt,statement_max_records):
+        if stmt[-1]==";": stmt=stmt[:-1]
+        return stmt+ f" \n LIMIT {statement_max_records};"
+     
+    def execute_with_diagnostics(self,stmt,max_records=None):
         error,res=None,None
+        stmt= self.inject_limit(stmt,max_records)
         try:
-            res=self.conn.execute(text(stmt))
+            res=self.conn.execute(text(stmt).execution_options(timeout=statement_timeout))
         except SQLAlchemyError as e:
             logging.info(f"exception {e} during execution of {stmt}")
             error=str(e.__dict__['orig'])
             logging.info(f"error executing {stmt} with {error}")
         return res,error
     
-    def fetch_samples(self,table_name,num_samples=3): return self.fetchall(f"select * from {table_name} LIMIT {num_samples}")
+    def fetch_samples(self,table_name,num_samples=3): return self.fetchall(f"select * from `{table_name}` LIMIT {num_samples}")
     
     def create_db(self,db_name,overwrite=True):
         if overwrite: self.drop_db(db_name)

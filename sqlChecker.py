@@ -4,7 +4,7 @@ from datetime import datetime
 import copy,json
 
 def remap_dict(d,key_map): return {key_map[k]:v for k,v in d.items()}
-max_num_records=100
+max_num_records=20
 
 class SQLChecker:
     def __init__(self):
@@ -15,10 +15,10 @@ class SQLChecker:
         self.tables=None
         self.cols=None
         
-    def test_kpis(self, user_uid):
+    def test_kpis(self, user_uid,max_num_records=max_num_records):
         self.prepare_test_round(user_uid)
         org_kpis_uids=self.mngDB.get_user_kpis_ids(user_uid)
-        for kpi_uid in org_kpis_uids:self.test_kpi(kpi_uid)
+        for kpi_uid in org_kpis_uids:self.test_kpi(kpi_uid,max_num_records=max_num_records)
         
     def prepare_test_round(self,user_uid):
         user_org=self.mngDB.get_user_org(user_uid)
@@ -35,14 +35,15 @@ class SQLChecker:
         else:
             return None,None,None
         
-    def test_kpi(self,kpi_uid):
+    def test_kpi(self,kpi_uid,max_num_records=max_num_records):
         kpi_info=self.mngDB.get_obj("kpi",kpi_uid)
-        stmt,src_res,error=self.test_kpi_info(kpi_info)
-        self.save_results(stmt,kpi_uid,src_res,error)
+        if kpi_info['sql_is_feasible']:
+            stmt,src_res,error=self.test_kpi_info(kpi_info,max_num_records)
+            self.save_results(stmt,kpi_uid,src_res,error)
         
-    def test_kpi_info(self,kpi_info):
+    def test_kpi_info(self,kpi_info,max_num_records=max_num_records):
         stmt=kpi_info['sql_stmt'].replace('@periodStart',self.period['testStartPeriod']).replace('@periodEnd',self.period['testEndPeriod'])
-        src_res,error=self.remote.fetchall_with_diagnostics(stmt)
+        src_res,error=self.remote.fetchall_with_diagnostics(stmt,max_num_records)
         return stmt,src_res,error
         
     def append_decoded(self,kpi_info,src_res):
@@ -57,11 +58,11 @@ class SQLChecker:
         return kpi_info
             
     def save_results(self, stmt,kpi_uid, src_res,error):
-        if len(src_res)==0: error="sql query returned empty table"
+        if src_res and len(src_res)==0: error="sql query returned empty table"
         kpi_info={'kpi_uid':kpi_uid,"sql_passed":"false",
                   "sql_test_time":f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
                   'sql_test_stmt':sql_text(stmt),'sql_error':sql_text(error) if error else "OK"}
-        self.mngDB.update_obj("kpi",self.append_decoded(kpi_info,src_res))
+        if error==None: self.mngDB.update_obj("kpi",self.append_decoded(kpi_info,src_res))
             
     def map_keys(self,rec):
         all_keys=dict(zip(rec.keys(),rec.keys()))

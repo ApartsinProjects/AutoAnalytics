@@ -37,8 +37,10 @@ class DBContentSummary(BaseModel):
     db_data_gaps:str
             
     
-def collect_key(dict_list, key): return [v[key] for v in dict_list]
-def samples_str(dict_list,key): return ",".join([str(v) for v in collect_key(dict_list,key)])
+def collect_key(dict_list, key): return [v[key] for v in dict_list] if dict_list else []
+def samples_str(dict_list,key): 
+    print(dict_list)
+    return sql_text(",".join([str(v) for v in collect_key(dict_list,key)])) if dict_list else None
 def alias_col_wrap(col_name): return col_name.replace(" ","_")
 
                   
@@ -69,7 +71,7 @@ class SchemeAnnotator:
             
     def insert_cols(self,table,cols,samples,org_uid):
         col_dict=[{'col_name':c['name'].lower(),'col_type':c['type'],"col_table_uid":table['table_uid'],
-                   "col_comment":c['comment'],
+                   "col_comment":sql_text(c['comment']),
                    "col_sample_vals":samples_str(samples,c['name'])} for c in cols]
         return self.mngDB.create_objs_batch("col",col_dict)
     

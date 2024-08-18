@@ -20,16 +20,16 @@ class ColumnSpecification(BaseModel):
     column_name: str
     
 class SQLImplementation(BaseModel):
-    sql_statement: str
-    grouping_columns: list[ColumnSpecification]
-    input_columns:list[ColumnSpecification]
+    #input_columns:list[ColumnSpecification]
+    #grouping_columns: list[ColumnSpecification]
+    #order_columns:list[ColumnSpecification]
     is_implementation_feasible:bool
+    sql_statement: str
     
 class SQLFixedQuery(BaseModel):
-    fixed_sql_statement: str
     identified_bug:str
     suggested_fix_description: str
-    
+    fixed_sql_statement: str
     
 class SQLGen:
     def __init__(self):
@@ -69,15 +69,19 @@ class SQLGen:
             Identify all relevant grouping columns or a grouping column combination in the database for computing the KPI.\
                 Decide if it's feasible to implement SQL statement given the described data data.\
                     If feasible, generate the required SQL query for the KPI. \
-                        Use @periodStart and @periodEnd as user-defined variables in the statement for defining the aggregation period."
+                         Order rows in the resulting KPI from most interesting to least interesting using ORDER BY clause.\
+                             If relevant,join with other tables for detailed information on each category.\
+                                    If relevant,format table entries by rounding, adding unit or scaling for improving readability of the result.\
+                                        If relevant, add units(in parentheses) to the display column names.\
+                                            Use @periodStart and @periodEnd as user-defined variables in the statement for defining the aggregation period."
             
         sql_impl=self.llm.struct_query(sys_msg,user_msg,SQLImplementation)
         self.mngDB.create_or_update_obj("kpi",
                               {"kpi_uid":kpi_uid,
                                #"sql_alias_stmt":sql_text(sql_impl.sql_statement),
                                "sql_stmt":sql_text(sql_impl.sql_statement),
-                               "sql_group_columns":sql_text(json.dumps([c.json() for c in sql_impl.grouping_columns])),
-                               "sql_cols":sql_text(json.dumps([c.json() for c in sql_impl.input_columns])),
+                               #"sql_group_columns":sql_text(json.dumps([c.json() for c in sql_impl.grouping_columns])),
+                               #"sql_cols":sql_text(json.dumps([c.json() for c in sql_impl.input_columns])),
                                "sql_is_feasible": "true" if sql_impl.is_implementation_feasible else "false"
                                })    
         
@@ -85,10 +89,14 @@ class SQLGen:
         kpi=self.mngDB.get_obj("kpi", kpi_uid)
        
         user_msg=f"Based on the database description above and the following KPI specification:'{kpi['kpi_name']}',identify all relevant input columns required for computing the KPI.\
-            Identify all relevant grouping columns or a grouping column combination in the database for computing the KPI.\
+             Identify all relevant grouping columns or a grouping column combination in the database for computing the KPI.\
                 Decide if it's feasible to implement SQL statement given the described data data.\
                     If feasible, generate the required SQL query for the KPI. \
-                        Use @periodStart and @periodEnd as user-defined variables in the statement for defining the aggregation period."
+                         Order rows in the resulting KPI from most interesting to least interesting using ORDER BY clause.\
+                             If relevant,join with other tables for detailed information on each category.\
+                                    If relevant,format table entries by rounding, adding unit or scaling for improving readability of the result.\
+                                        If relevant, add units(in parentheses) to the display column names.\
+                                            Use @periodStart and @periodEnd as user-defined variables in the statement for defining the aggregation period"
             
         sql_impl=self.llm.struct_query(sys_msg,user_msg,SQLImplementation)
         sql_decoded_stmt=self.decode_sql_aliases(sql_impl.sql_statement)
@@ -96,8 +104,8 @@ class SQLGen:
                               {"kpi_uid":kpi_uid,
                                "sql_alias_stmt":sql_text(sql_impl.sql_statement),
                                "sql_stmt":sql_text(sql_decoded_stmt),
-                               "sql_group_columns":sql_text(json.dumps([c.json() for c in sql_impl.grouping_columns])),
-                               "sql_cols":sql_text(json.dumps([c.json() for c in sql_impl.input_columns])),
+                               #"sql_group_columns":sql_text(json.dumps([c.json() for c in sql_impl.grouping_columns])),
+                               #"sql_cols":sql_text(json.dumps([c.json() for c in sql_impl.input_columns])),
                                "sql_is_feasible": "true" if sql_impl.is_implementation_feasible else "false"
                                })    
            
@@ -114,7 +122,8 @@ class SQLGen:
         sys_msg=f"You are experienced MySQL developer that need to debug SQL queries for the database defined by the following columns and tables:[{SchemePrompt().get_annotated_schema_prompt(self.user_info['user_org_uid'])}]"
         error_kpis=self.mngDB.store.fetchall(f"select kpis.* from kpis join tasks on kpis.kpi_task_uid=tasks.task_uid where tasks.task_user_uid='{user_uid}' and kpis.sql_passed=False")
         sqlChecker=SQLChecker().prepare_test_round(user_uid)
-        for kpi in error_kpis: self.debug_sql(sys_msg,kpi,sqlChecker)
+        if error_kpis:
+            for kpi in error_kpis: self.debug_sql(sys_msg,kpi,sqlChecker)
         
     def update_fixed_sql(self, kpi_uid, new_stmt,new_test_stmt,new_res):
         logging.info(f"fixed SQL statement for kpi={kpi_uid}")
@@ -141,7 +150,7 @@ class SQLGen:
                 self.update_fixed_sql(kpi['kpi_uid'],last_stmt, last_test_stmt,last_res)
                 break
             else:
-                if len(last_res)==0: last_error="sql query returned empty table"
+                if (last_error is None) and len(last_res)==0: last_error="sql query returned empty table"
         if last_error: logging.info(f"after {max_attempts-left_attempts} for kpi:{kpi['kpi_uid']} error remains {kpi['sql_error']}")
         return last_error==None
                                     
