@@ -12,7 +12,9 @@ import logging
 
 class TAGenie:
     def __init__(self):
-        self.Phases={"create":self.provision_user,
+        self.Phases={
+                    "delete": self.delete_case,
+                    "create":self.provision_user,
                      "schema":self.prepare_schema,
                      "tasks":self.generate_tasks,
                      "kpis":self.generate_kpis,
@@ -24,27 +26,35 @@ class TAGenie:
                      "visuals":self.generate_visuals}
         
     def process(self,use_case,steps=["create","schema","tasks","sql","test","report","debug","report","insights","visuals"]):
-        if "create" in steps:
-            user_uid=self.provision_user(use_case['user'],use_case['org'])
-            steps=steps[1:]
-        else:
-            user_uid=MngDB().store.find_obj_id("users","user_uid",f"user_name='{use_case['user']['user_name']}'")
-        for s in steps:self.Phases[s](user_uid)
+        
+        for s in steps:
+            if s in ['create','delete']:
+                self.Phases[s](use_case)
+            else:
+                user_obj=MngDB().find_user(use_case['user']['user_name']) 
+                if user_obj: 
+                    self.Phases[s](user_obj['user_uid'])
+                else:
+                    logging.info(f"can't find user {use_case['user']['user_name']}")
+                    break
+                
+                
         logging.info(f"\n*********************************** done ****************************************************************************\n")
         
-    def generate_use_case(self, use_case): 
-        return self.process(use_case)
+    def delete_case(self,use_case): 
+        logging.info(f"\n============================ deleting case data=======================================================\n")
+        return MngDB().delete_case_data(use_case['user']['user_name'])
     
-    def provision_user(self,user_info,org_info): 
+    def provision_user(self,use_case): 
         logging.info(f"\n============================ starting provisioning of user and his org=======================================================\n")
-        return MngDB().create_or_update_user(user_info, org_info)['user_uid']
+        return MngDB().create_case(use_case['user'], use_case['org'])
     
     def generate_insights(self, user_uid):
         logging.info(f"\n============================ generating insights =======================================================\n")
         return InsightGen().derive_insights(user_uid)
     
     def prepare_schema(self, user_uid): 
-        org_uid=MngDB().get_obj("user",user_uid)["user_org_uid"]
+        org_uid=MngDB().get_user(user_uid)["user_org_uid"]
         logging.info(f"\n============================ fetching and annotating DB scheme=======================================================\n")
         return SchemeAnnotator().prepare_schema(org_uid)
     

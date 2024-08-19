@@ -16,7 +16,7 @@ class TaskGen:
         self.mngDB=MngDB()
         
     def generate_user_tasks(self,user_uid):
-        self.mngDB.delete_user_tasks(user_uid)
+        self.mngDB.del_user_tasks(user_uid)
         user_info,org_info,tasks=self.mngDB.describe_user(user_uid)
         sys_msg="You are a helpful business analyst"
         user_msg=f"Describe job responsibilities and tasks for each responsibility for job role:'{user_info['user_role']}' at {org_info['org_descr']}"
@@ -26,6 +26,6 @@ class TaskGen:
     def insert_tasks(self, responsibilities, user_uid):
         for responsibility in responsibilities:
             for task in responsibility.responsibility_tasks:
-                task_info={"task_name":sql_text(task),"task_responsibility": sql_text(responsibility.job_responsibility), "task_user_uid":user_uid}
-                self.mngDB.create_or_update_task(task_info)
+                task_info={"task_name":task,"task_responsibility": responsibility.job_responsibility, "task_user_uid":user_uid}
+                self.mngDB.insert_or_update_task(task_info)
     

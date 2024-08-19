@@ -6,6 +6,9 @@ from sqlalchemy.event import listen
 
 statement_timeout=20 #in seconds
 
+def sql_name(elem_str): return  elem_str if elem_str.startswith("`") else f"`{db_name(elem_str)}`"
+def db_name(elem_str): return elem_str.lower()
+    
 @event.listens_for(Engine, "before_cursor_execute")
 def _set_timeout(conn, cursor, stmt, params, context, executemany):
     timeout = context.execution_options.get('timeout', None)
@@ -43,7 +46,7 @@ class DataSource:
     def fetch_table_pkeys(self,table_name): return inspect(self.engine).get_pk_constraint(table_name)
     def fetch_table_fkeys(self,table_name): return inspect(self.engine).get_foreign_keys(table_name)
         
-    def fetch_columns(self,table_name="nesreca"): return inspect(self.engine).get_columns(table_name)
+    def fetch_table_cols(self,table_name="nesreca"): return inspect(self.engine).get_columns(table_name)
     def fetchall(self, statement):
         res=self.execute(statement).mappings().all()
         return [dict(r) for r in res] if res else None
@@ -74,7 +77,7 @@ class DataSource:
             logging.info(f"error executing {stmt} with {error}")
         return res,error
     
-    def fetch_samples(self,table_name,num_samples=3): return self.fetchall(f"select * from `{table_name}` LIMIT {num_samples}")
+    def fetch_col_samples(self,table_name,num_samples=3): return self.fetchall(f"select * from {sql_name(table_name)} LIMIT {num_samples}")
     
     def create_db(self,db_name,overwrite=True):
         if overwrite: self.drop_db(db_name)

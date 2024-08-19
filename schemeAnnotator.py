@@ -1,6 +1,6 @@
 from pydantic import BaseModel # type: ignore
 import logging,json
-from dataSource import DataSource
+from dataSource import DataSource,db_name
 from llmAgent import LLMAgent
 from mngDB import MngDB,sql_text
 from schemePrompt import SchemePrompt
@@ -38,11 +38,8 @@ class DBContentSummary(BaseModel):
             
     
 def collect_key(dict_list, key): return [v[key] for v in dict_list] if dict_list else []
-def samples_str(dict_list,key): 
-    print(dict_list)
-    return sql_text(",".join([str(v) for v in collect_key(dict_list,key)])) if dict_list else None
+def samples_str(dict_list,key): return ",".join([str(v) for v in collect_key(dict_list,key)]) if dict_list else None
 def alias_col_wrap(col_name): return col_name.replace(" ","_")
-
                   
 class SchemeAnnotator:
     def __init__(self):
@@ -50,47 +47,49 @@ class SchemeAnnotator:
          self.llm=LLMAgent()
          self.remote_ds=DataSource()
     
-    def prepare_schema(self,org_uid):
-        self.fetch_schema(org_uid)
+    def prepare_schema(self,org_uid, num_col_samples=3):
+        self.fetch_schema(org_uid,num_col_samples)
         self.enrich_schema(org_uid)
         self.summarize_scheme(org_uid)
          
-    def fetch_schema(self, org_uid):
-        self.mngDB.delete_org_scheme(org_uid)
-        org_info=self.mngDB.get_obj("org",org_uid)
-        self.remote_ds.connect_str(org_info["org_conn_str"])
-        tables=self.remote_ds.fetch_tables()
-        tables_info=self.mngDB.create_objs_batch("table",
-                [{'table_name':table,
-                  "table_org_uid":org_uid,
-                  "table_pkeys":sql_text(json.dumps(self.remote_ds.fetch_table_pkeys(table))),
-                  "table_fkeys":sql_text(json.dumps(self.remote_ds.fetch_table_fkeys(table))),
-                  }
-                  for table in tables])
-        for table in tables_info: self.insert_cols(table,self.remote_ds.fetch_columns(table['table_name']),self.remote_ds.fetch_samples(table['table_name']),org_uid)
+    def fetch_schema(self, org_uid,num_cols_samples=3):
+        self.mngDB.del_org_scheme(org_uid)
+        self.remote_ds.connect_str(self.mngDB.get_org_conn_str(org_uid))
+        tables_info=self.fetch_save_tables(org_uid)
+        for table in tables_info: self.fetch_save_cols(table,num_cols_samples)
             
-    def insert_cols(self,table,cols,samples,org_uid):
-        col_dict=[{'col_name':c['name'].lower(),'col_type':c['type'],"col_table_uid":table['table_uid'],
-                   "col_comment":sql_text(c['comment']),
-                   "col_sample_vals":samples_str(samples,c['name'])} for c in cols]
-        return self.mngDB.create_objs_batch("col",col_dict)
+    def fetch_save_tables(self,org_uid):
+        return self.mngDB.insert_org_tables(org_uid,
+            [{'table_name':db_name(table),
+              "table_pkeys":self.remote_ds.fetch_table_pkeys(table),
+              "table_fkeys":self.remote_ds.fetch_table_fkeys(table)} 
+            for table in self.remote_ds.fetch_tables()])
+        
+    def fetch_save_cols(self,table,num_col_samples=3):
+        samples=self.remote_ds.fetch_col_samples(table['table_name'],num_samples=num_col_samples)
+        return self.mngDB.insert_table_cols(table['table_uid'],
+            [{'col_name':db_name(c['name']),
+              'col_type':str(c['type']),
+              "col_comment":c['comment'],
+              "col_sample_vals":samples_str(samples,c['name'])} 
+            for c in self.remote_ds.fetch_table_cols(table['table_name'])])
     
     def summarize_scheme(self,org_uid):
-        org_info=self.mngDB.get_obj("org",org_uid)
+        org_info=self.mngDB.get_org(org_uid)
         scheme_prompt=SchemePrompt().get_rich_schema_prompt(org_uid)
         sys_msg=f"you are investigating the content of the database in organization:'{org_info['org_descr']}' produced by the system:'{org_info['org_data_app']}'"
         user_msg=f"You have received the following description of the database's tables and columns:[{scheme_prompt}]. Summarize the content of the database in plain English\
             while mentioning major entities, relations and entity attributes represented by the database. Also describe data gaps- content that is not present in the database but might be helpful for the organization"
         data_summary=self.llm.struct_query(sys_msg,user_msg,DBContentSummary)
-        self.mngDB.update_obj("org",{"org_uid":org_uid,
-                                    "data_summary":sql_text(data_summary.db_summary), 
-                                    "data_relations":sql_text(json.dumps(data_summary.db_relations)),
-                                    "data_entities":sql_text(json.dumps(data_summary.db_entities)), 
-                                    "data_gaps":sql_text(data_summary.db_data_gaps)})
-        
+        self.mngDB.update_org(org_uid,
+            { "data_summary":data_summary.db_summary, 
+            "data_relations":data_summary.db_relations,
+            "data_entities":data_summary.db_entities, 
+            "data_gaps":data_summary.db_data_gaps})
+
     def enrich_schema(self,org_uid):
-        org_info=self.mngDB.get_obj("org",org_uid)
-        scheme_prompt=SchemePrompt().get_schema_prompt(org_info['org_uid'])
+        org_info=self.mngDB.get_org(org_uid)
+        scheme_prompt=SchemePrompt().get_schema_prompt(org_uid)
         sys_msg=f"You are database developer trying to guess semantics of the data store based on column and table names.\
             You know that the database belong to organization:'{org_info['org_descr']}' and its collected by '{org_info['org_data_app']}'"
         user_msg=f"try to guess useful information about the semantics of tables and columns based on\
@@ -98,13 +97,19 @@ class SchemeAnnotator:
                 Generate descriptions and longer meaningful English alias names for the original table and column names.\
                     Separate descriptive annotation and reasoning on why your guesses are reasonable"
         data_scheme=self.llm.struct_query(sys_msg,user_msg,DataScheme)
-        for table in data_scheme.tables: self.update_scheme(table,org_uid)
+        for table in data_scheme.tables: self.update_table_scheme(table,org_uid)
     
-    def update_scheme(self,table,org_uid):
-        table_info={"table_org_uid":org_uid, "table_name":table.table_name.lower(),"table_alias":alias_col_wrap(table.table_alias),
-                    "table_desc":sql_text(table.table_description),"table_desc_justification":sql_text(table.table_annotation_justification)}
-        table_info=self.mngDB.find_update_obj("table",f"table_name='{table.table_name.lower()}' and table_org_uid='{org_uid}'",table_info)
+    def update_table_scheme(self,table,org_uid):
+        table_info=self.mngDB.update_org_table_by_name(org_uid, 
+            {"table_name":db_name(table.table_name),
+            "table_alias":table.table_alias,
+            "table_desc":table.table_description,
+            "table_desc_justification":table.table_annotation_justification})
+    
         for col in table.table_columns:
-            col_info={"col_name":col.original_column_name.lower(),"col_units":col.column_units,"col_desc":sql_text(col.column_description),
-                      "col_alias":alias_col_wrap(col.column_alias),"col_desc_justification":sql_text(col.column_annotation_justification),"col_table_uid":table_info['table_uid']}
-            col_info=self.mngDB.find_update_obj("col",f"col_name='{col.original_column_name.lower()}' and col_table_uid='{table_info['table_uid']}'",col_info)
+            self.mngDB.update_table_col_by_name(table_info['table_uid'],
+                {"col_name":db_name(col.original_column_name),
+                "col_units":col.column_units,
+                "col_desc":col.column_description,
+                "col_alias":col.column_alias,
+                "col_desc_justification":col.column_annotation_justification})

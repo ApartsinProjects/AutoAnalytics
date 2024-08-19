@@ -2,9 +2,11 @@
     "cSpell.words": [
         "descr",
         "kpis",
+        "pkey",
         "pydantic",
         "pymysql",
         "sqlalchemy",
-        "taskanalytics"
+        "taskanalytics",
+        "uids"
     ]
 }
