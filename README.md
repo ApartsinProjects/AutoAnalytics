@@ -1,6 +1,6 @@
 # AutoAnalytics
 
-![AutoAnalytics Hero](docs/figures/hero_top.png)
+![AutoAnalytics Hero](docs/figures/hero_top.jpg)
 
 AutoAnalytics is a research project on **AI-native analytics design**: not only translating questions into SQL, but helping determine **which questions are meaningful and answerable** given the data that actually exists.
 
@@ -87,6 +87,6 @@ python scripts/generate_gemini_figures.py
 
 Outputs:
 
-- `docs/figures/hero_top.png`
+- `docs/figures/hero_top.jpg`
 
 All images are conceptual communication assets intended for research presentation.

@@ -18,7 +18,7 @@ from google.genai import types
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "docs" / "figures"
-HERO_PATH = OUT_DIR / "hero_top.png"
+HERO_PATH = OUT_DIR / "hero_top.jpg"
 MODEL_CANDIDATES = [
     "gemini-3.1-flash-image-preview",
     "gemini-3-pro-image-preview",
