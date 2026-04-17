@@ -142,8 +142,8 @@ app, rt = fast_app(
     hdrs=(
         #Link(rel='stylesheet', href='assets/normalize.min.css', type='text/css'),
         #Link(rel='stylesheet', href='assets/sakura.css', type='text/css'),
-        Link(rel='stylesheet', href='/users.css', type='text/css'),
-        Link(rel='stylesheet', href='/user.css', type='text/css')
+        Link(rel='stylesheet', href='/assets/styles/users.css', type='text/css'),
+        Link(rel='stylesheet', href='/assets/styles/user.css', type='text/css')
 ))   
 
 
