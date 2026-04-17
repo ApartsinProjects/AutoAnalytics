@@ -10,6 +10,7 @@ Usage (PowerShell):
 from __future__ import annotations
 
 import os
+from io import BytesIO
 from pathlib import Path
 
 from google import genai
@@ -18,7 +19,7 @@ from google.genai import types
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "docs" / "figures"
-HERO_PATH = OUT_DIR / "hero_top.jpg"
+HERO_PATH = OUT_DIR / "hero_top.png"
 MODEL_CANDIDATES = [
     "gemini-3.1-flash-image-preview",
     "gemini-3-pro-image-preview",
@@ -52,7 +53,13 @@ def _generate_png(client: genai.Client, prompt: str, out_path: Path) -> None:
                 ),
             )
             image_bytes = _extract_first_image_bytes(response)
-            out_path.write_bytes(image_bytes)
+            # Gemini often returns JPEG bytes; transcode to real PNG for reliable README rendering.
+            try:
+                from PIL import Image  # type: ignore
+                img = Image.open(BytesIO(image_bytes)).convert("RGB")
+                img.save(out_path, format="PNG", optimize=True)
+            except Exception:
+                out_path.write_bytes(image_bytes)
             print(f"Used model: {model_name}")
             return
         except Exception as exc:  # pragma: no cover
