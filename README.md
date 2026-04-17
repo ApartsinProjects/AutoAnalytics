@@ -38,6 +38,10 @@ AutoAnalytics solves a broader loop:
 
 That means AutoAnalytics is not just a query translator; it is a **question discovery and analytics orchestration framework**.
 
+### Text2SQL vs AutoAnalytics
+
+![Text2SQL vs AutoAnalytics](docs/figures/text2sql_vs_autoanalytics.png)
+
 ### Conceptual Diagram (Hero)
 
 The hero image above is intentionally used as the project diagram:  
@@ -88,5 +92,6 @@ python scripts/generate_gemini_figures.py
 Outputs:
 
 - `docs/figures/hero_top.png`
+- `docs/figures/text2sql_vs_autoanalytics.png`
 
 All images are conceptual communication assets intended for research presentation.

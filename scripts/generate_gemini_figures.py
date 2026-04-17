@@ -20,6 +20,7 @@ from google.genai import types
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "docs" / "figures"
 HERO_PATH = OUT_DIR / "hero_top.png"
+DIFF_PATH = OUT_DIR / "text2sql_vs_autoanalytics.png"
 MODEL_CANDIDATES = [
     "gemini-3.1-flash-image-preview",
     "gemini-3-pro-image-preview",
@@ -92,9 +93,21 @@ def main() -> int:
         "white-space-friendly for README, very polished, no watermark, no logos, no long text."
     )
 
+    diff_prompt = (
+        "Create a side-by-side conceptual comparison diagram for a research README. "
+        "Left panel: 'Text2SQL' with simple flow user question -> SQL -> table result. "
+        "Right panel: 'AutoAnalytics' with broader loop data understanding -> question discovery -> KPI design -> SQL generation -> validation -> insights. "
+        "Include a clear label on right panel: 'Question Space from Available Data'. "
+        "Keep layout clean, publication style, white background, strong contrast, concise labels, no watermark."
+    )
+
     print("Generating hero image with Gemini...")
     _generate_png(client, hero_prompt, HERO_PATH)
     print(f"Saved: {HERO_PATH}")
+
+    print("Generating Text2SQL comparison diagram with Gemini...")
+    _generate_png(client, diff_prompt, DIFF_PATH)
+    print(f"Saved: {DIFF_PATH}")
 
     return 0
 
